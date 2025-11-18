@@ -1,0 +1,43 @@
+{
+  "skills": [
+    "AWS",
+    "Agile",
+    "CI/CD",
+    "Cassandra",
+    "Django",
+    "Docker",
+    "Git",
+    "GitHub",
+    "Gitlab",
+    "Java",
+    "Jenkins",
+    "Kotlin",
+    "MySQL",
+    "NLP",
+    "PostgreSQL",
+    "Python",
+    "SQL",
+    "Scrum",
+    "Spring",
+    "go",
+    "r",
+    "scala",
+    "swift"
+  ],
+  "experience": [],
+  "education": [
+    {
+      "degree": "Bachelor's Degree",
+      "institution": "Unknown",
+      "startDate": "Unknown",
+      "endDate": "Unknown",
+      "fieldOfStudy": null
+    }
+  ],
+  "phone": "015154346438",
+  "email": "ahmedmahmoud.eltaher@gmail.com",
+  "years_of_experience": 0.0,
+  "file_hash": "7f6aec70351fbbf7e9c98237996cda93",
+  "parsed_at": "2025-11-18T19:55:24.885817",
+  "full_text_length": 7087
+}

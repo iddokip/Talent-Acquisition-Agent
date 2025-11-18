@@ -18,8 +18,8 @@ except ImportError:
 from .base_parser import BaseParser
 
 
-class AdvancedCVParser(BaseParser):
-    """Advanced CV parser with comprehensive information extraction"""
+class CVParser(BaseParser):
+    """Comprehensive CV parser with extensive information extraction capabilities"""
     
     # Expanded skill keywords
     SKILL_KEYWORDS = {

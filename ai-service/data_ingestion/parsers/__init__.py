@@ -1,6 +1,9 @@
 """CV Parser modules"""
 
 from .base_parser import BaseParser
-from .advanced_cv_parser import AdvancedCVParser
+from .cv_parser import CVParser
 
-__all__ = ["BaseParser", "AdvancedCVParser"]
+# Keep AdvancedCVParser as alias for backward compatibility
+AdvancedCVParser = CVParser
+
+__all__ = ["BaseParser", "CVParser", "AdvancedCVParser"]
