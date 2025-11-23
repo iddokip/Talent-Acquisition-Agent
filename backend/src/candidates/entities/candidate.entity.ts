@@ -76,7 +76,7 @@ export class Candidate {
   @Column('jsonb', { nullable: true })
   scoringDetails: ScoringDetails;
 
-  @Column({ nullable: true })
+  @Column('float', { nullable: true, default: 0 })
   yearsOfExperience: number;
 
   @Column({ default: 'pending' })

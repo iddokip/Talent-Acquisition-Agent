@@ -111,7 +111,7 @@ export default function Home() {
 
         {/* Footer */}
         <div className="text-center mt-16 text-gray-500 text-sm">
-          <p>Powered by LangChain, Ollama, NestJS & Next.js</p>
+          <p>Ahmed Eltaher</p>
         </div>
       </div>
     </main>

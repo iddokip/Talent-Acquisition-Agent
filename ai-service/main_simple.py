@@ -2,10 +2,12 @@ from fastapi import FastAPI, HTTPException, UploadFile, File
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 from typing import List, Optional
+from pathlib import Path
 import os
 import json
 import tempfile
 from enhanced_cv_service import EnhancedCVService
+from services.pdf_to_txt_converter import PDFToTextConverter
 
 
 app = FastAPI(
@@ -65,8 +67,9 @@ class RankRequest(BaseModel):
     candidates: List[Candidate]
 
 
-# Initialize enhanced CV service
+# Initialize services
 cv_service = EnhancedCVService()
+pdf_converter = PDFToTextConverter()
 
 
 @app.on_event("shutdown")
@@ -93,33 +96,69 @@ async def root():
 @app.post("/parse-cv")
 async def parse_cv(file: UploadFile = File(...)):
     """
-    Parse CV with caching and vector database indexing
+    Parse CV with caching and vector database indexing.
+    Automatically converts PDF to text and caches it.
     """
     try:
+        # Validate file type
+        if not file.filename.lower().endswith(('.pdf', '.docx')):
+            raise HTTPException(
+                status_code=400,
+                detail="Only PDF and DOCX files are supported"
+            )
+        
+        # Determine file extension
+        file_ext = '.pdf' if file.filename.lower().endswith('.pdf') else '.docx'
+        
         # Save uploaded file temporarily
-        with tempfile.NamedTemporaryFile(delete=False, suffix='.pdf') as tmp_file:
+        with tempfile.NamedTemporaryFile(delete=False, suffix=file_ext) as tmp_file:
             content = await file.read()
             tmp_file.write(content)
             tmp_path = tmp_file.name
         
-        # Parse with caching and indexing
+        # Step 1: Convert PDF to text and cache it (only for PDFs)
+        txt_conversion_result = None
+        if file.filename.lower().endswith('.pdf'):
+            try:
+                txt_conversion_result = pdf_converter.convert_pdf_to_text(
+                    tmp_path,
+                    output_filename=Path(file.filename).stem,
+                    preserve_formatting=True,
+                    method="auto"
+                )
+                
+                if txt_conversion_result["success"]:
+                    print(f"✓ PDF converted to text: {txt_conversion_result['text_file_path']}")
+                else:
+                    print(f"⚠ PDF to text conversion failed: {txt_conversion_result.get('error')}")
+            except Exception as e:
+                print(f"⚠ Warning: PDF to text conversion failed: {e}")
+        
+        # Step 2: Parse with caching and indexing
         result = cv_service.parse_cv_with_cache(tmp_path)
         
-        # Clean up
+        # Step 3: Add text conversion info to result
+        if txt_conversion_result and txt_conversion_result["success"]:
+            result["text_conversion"] = {
+                "text_file_path": txt_conversion_result["text_file_path"],
+                "text_length": txt_conversion_result["text_length"],
+                "method_used": txt_conversion_result["method_used"],
+                "converted_at": txt_conversion_result["converted_at"]
+            }
+        
+        # Clean up temporary file
         os.unlink(tmp_path)
         
         return result
+        
+    except HTTPException:
+        raise
     except Exception as e:
         print(f"Error parsing CV: {e}")
-        # Return default response if parsing fails
-        return {
-            "skills": [],
-            "experience": [],
-            "education": [],
-            "phone": None,
-            "email": None,
-            "years_of_experience": 0
-        }
+        raise HTTPException(
+            status_code=500,
+            detail=f"Error parsing CV: {str(e)}"
+        )
 
 
 @app.post("/rank-candidates")
@@ -247,6 +286,132 @@ async def cleanup_candidate(candidate_id: str):
         }
 
 
+@app.post("/convert-pdf-to-text")
+async def convert_pdf_to_text(
+    file: UploadFile = File(...),
+    preserve_formatting: bool = True
+):
+    """
+    Convert uploaded PDF CV to plain text file
+    
+    Args:
+        file: PDF file to convert
+        preserve_formatting: Whether to preserve page separators and formatting
+        
+    Returns:
+        Conversion result with text file path and metadata
+    """
+    try:
+        if not file.filename.lower().endswith('.pdf'):
+            raise HTTPException(
+                status_code=400,
+                detail="Only PDF files are supported"
+            )
+        
+        # Read file content
+        content = await file.read()
+        
+        # Convert PDF to text
+        result = pdf_converter.convert_pdf_bytes_to_text(
+            content,
+            file.filename,
+            preserve_formatting=preserve_formatting
+        )
+        
+        if not result["success"]:
+            raise HTTPException(
+                status_code=500,
+                detail=f"Conversion failed: {result.get('error', 'Unknown error')}"
+            )
+        
+        return result
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(
+            status_code=500,
+            detail=f"Error converting PDF: {str(e)}"
+        )
+
+
+@app.post("/batch-convert-pdfs")
+async def batch_convert_pdfs(
+    pdf_directory: str,
+    file_pattern: str = "*.pdf",
+    preserve_formatting: bool = True
+):
+    """
+    Convert multiple PDF files in a directory to text
+    
+    Args:
+        pdf_directory: Path to directory containing PDF files
+        file_pattern: Glob pattern to match files (default: *.pdf)
+        preserve_formatting: Whether to preserve formatting
+        
+    Returns:
+        Batch conversion results
+    """
+    try:
+        result = pdf_converter.batch_convert(
+            pdf_directory,
+            file_pattern=file_pattern,
+            preserve_formatting=preserve_formatting
+        )
+        
+        if not result.get("total_files"):
+            raise HTTPException(
+                status_code=404,
+                detail=f"No PDF files found in {pdf_directory}"
+            )
+        
+        return result
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(
+            status_code=500,
+            detail=f"Error in batch conversion: {str(e)}"
+        )
+
+
+@app.get("/pdf-preview")
+async def get_pdf_preview(pdf_path: str, max_chars: int = 500):
+    """
+    Get a text preview of a PDF file
+    
+    Args:
+        pdf_path: Path to the PDF file
+        max_chars: Maximum characters to return (default: 500)
+        
+    Returns:
+        Text preview of the PDF
+    """
+    try:
+        if not os.path.exists(pdf_path):
+            raise HTTPException(
+                status_code=404,
+                detail=f"PDF file not found: {pdf_path}"
+            )
+        
+        preview = pdf_converter.get_text_preview(pdf_path, max_chars)
+        
+        return {
+            "pdf_path": pdf_path,
+            "preview": preview,
+            "preview_length": len(preview)
+        }
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(
+            status_code=500,
+            detail=f"Error generating preview: {str(e)}"
+        )
+
+
 @app.get("/health")
 async def health_check():
     """Health check endpoint"""
@@ -256,7 +421,8 @@ async def health_check():
         "features": {
             "caching": True,
             "vector_db": cv_service.weaviate_client is not None,
-            "detailed_scoring": True
+            "detailed_scoring": True,
+            "pdf_to_text_conversion": True
         }
     }
 

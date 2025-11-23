@@ -7,7 +7,7 @@ from datetime import datetime
 import weaviate
 from weaviate.classes.init import Auth
 from weaviate.classes.config import Configure, Property, DataType
-from data_ingestion.parsers.cv_parser import CVParser
+from services.cv_parser import CVParser
 
 
 class EnhancedCVService:

@@ -5,7 +5,7 @@ This module provides comprehensive data ingestion capabilities for CV/Resume pro
 including parsing, validation, transformation, and loading.
 """
 
-from .parsers.cv_parser import CVParser
+from services.cv_parser import CVParser
 from .parsers.base_parser import BaseParser
 
 # Keep AdvancedCVParser as alias for backward compatibility
