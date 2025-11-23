@@ -38,17 +38,23 @@ try:
 except ImportError:
     date_parser = None
 
-# LLM integration (optional)
+# LLM integration - Direct Ollama API
 try:
-    from langchain_community.llms import Ollama
-    from langchain.prompts import PromptTemplate
-    from langchain.chains import LLMChain
-    LANGCHAIN_AVAILABLE = True
-except (ImportError, TypeError, AttributeError) as e:
-    # Handle both missing dependencies and version compatibility issues
-    LANGCHAIN_AVAILABLE = False
+    from services.llm_cv_extractor import LLMCVExtractor
+    LLM_EXTRACTOR_AVAILABLE = True
+except ImportError as e:
+    LLM_EXTRACTOR_AVAILABLE = False
     import warnings
-    warnings.warn(f"LangChain not available: {e}. Using regex-only parsing.")
+    warnings.warn(f"LLM Extractor not available: {e}. Using regex-only parsing.")
+
+# Weaviate vector database integration
+try:
+    from services.weaviate_client import WeaviateClient
+    WEAVIATE_AVAILABLE = True
+except ImportError as e:
+    WEAVIATE_AVAILABLE = False
+    import warnings
+    warnings.warn(f"Weaviate client not available: {e}. Vector storage disabled.")
 
 # Import BaseParser if available (for data ingestion compatibility)
 try:
@@ -163,33 +169,63 @@ class CVParser(BaseParser):
         """Initialize the unified CV parser"""
         super().__init__()
         self.config = config or {}
-        self.version = "3.0.0"  # Unified version
+        self.version = "3.1.0"  # Updated version with direct LLM integration
         self.ollama_url = os.getenv("OLLAMA_BASE_URL", "http://localhost:11434")
         self.model_name = os.getenv("MODEL_NAME", "qwen2.5:7b")
-        self.use_llm = self.config.get("use_llm", True) and LANGCHAIN_AVAILABLE
         
         # Text cache directory
         self.text_cache_dir = self.config.get("text_cache_dir", "cv_text_cache")
         os.makedirs(self.text_cache_dir, exist_ok=True)
         
-        # Initialize Ollama LLM if available
+        # LLM response cache directory
+        self.llm_cache_dir = self.config.get("llm_cache_dir", "llm_cv_json_response")
+        os.makedirs(self.llm_cache_dir, exist_ok=True)
+        
+        # Initialize LLM extractor (direct Ollama API)
+        self.use_llm = self.config.get("use_llm", True) and LLM_EXTRACTOR_AVAILABLE
+        
         if self.use_llm:
             try:
-                self.llm = Ollama(
+                self.llm_extractor = LLMCVExtractor(
                     base_url=self.ollama_url,
-                    model=self.model_name,
-                    temperature=0.1
+                    model=self.model_name
                 )
-                logger.info("LLM initialized successfully")
+                if self.llm_extractor.is_available():
+                    logger.info("✅ LLM extractor initialized and connected")
+                    self.llm = self.llm_extractor  # For compatibility
+                else:
+                    logger.warning("⚠️  Ollama not reachable. Using regex-only parsing.")
+                    self.use_llm = False
+                    self.llm = None
             except Exception as e:
-                logger.warning(f"Failed to initialize LLM: {e}. Using regex-only parsing.")
+                logger.warning(f"Failed to initialize LLM extractor: {e}. Using regex-only parsing.")
                 self.use_llm = False
+                self.llm = None
         else:
             self.llm = None
+            self.llm_extractor = None
             logger.info("Using regex-only parsing (LLM disabled)")
         
-        # LLM prompts
-        self._init_prompts()
+        # Initialize Weaviate client for vector storage
+        self.use_vector_db = self.config.get("use_vector_db", True) and WEAVIATE_AVAILABLE
+        weaviate_url = os.getenv("WEAVIATE_URL", "http://localhost:8080")
+        
+        if self.use_vector_db:
+            try:
+                self.weaviate_client = WeaviateClient(url=weaviate_url)
+                if self.weaviate_client.is_available():
+                    logger.info("✅ Weaviate client initialized and connected")
+                else:
+                    logger.warning("⚠️  Weaviate not reachable. Vector storage disabled.")
+                    self.use_vector_db = False
+                    self.weaviate_client = None
+            except Exception as e:
+                logger.warning(f"Failed to initialize Weaviate: {e}. Vector storage disabled.")
+                self.use_vector_db = False
+                self.weaviate_client = None
+        else:
+            self.weaviate_client = None
+            logger.info("Vector storage disabled (Weaviate not available)")
     
     def _init_prompts(self):
         """Initialize LLM prompt templates"""
@@ -269,7 +305,7 @@ Return ONLY valid JSON in this exact format (no additional text):
         # Step 4: Enhance with LLM if available
         if self.use_llm and self.llm:
             try:
-                llm_data = await self._parse_with_llm(cleaned_text)
+                llm_data = await self._parse_with_llm(cleaned_text, file_hash, filename)
                 # Merge LLM results with regex results (LLM takes precedence if fields exist)
                 final_data = self._merge_parse_results(regex_data, llm_data)
             except Exception as e:
@@ -279,6 +315,7 @@ Return ONLY valid JSON in this exact format (no additional text):
             final_data = regex_data
         
         # Step 5: Add metadata
+        final_data["file_hash"] = file_hash
         final_data["metadata"] = {
             "parsed_at": start_time.isoformat(),
             "file_hash": file_hash,
@@ -286,6 +323,25 @@ Return ONLY valid JSON in this exact format (no additional text):
             "parsing_method": "llm+regex" if self.use_llm else "regex_only",
             "text_length": len(text)
         }
+        
+        # Step 6: Store in Weaviate vector database (if available)
+        if self.use_vector_db and self.weaviate_client:
+            try:
+                logger.info("💾 Storing CV in Weaviate vector database...")
+                weaviate_uuid = self.weaviate_client.store_cv(
+                    cv_data=final_data,
+                    plain_text=text,  # Store full plain text as metadata
+                    candidate_id=final_data.get("email") or file_hash
+                )
+                if weaviate_uuid:
+                    final_data["weaviate_uuid"] = weaviate_uuid
+                    logger.info(f"✅ Stored in Weaviate: {weaviate_uuid}")
+                else:
+                    logger.warning("⚠️  Failed to store in Weaviate")
+            except Exception as e:
+                logger.error(f"❌ Weaviate storage error: {e}")
+        else:
+            logger.info("ℹ️  Weaviate storage skipped (not available)")
         
         duration = (datetime.utcnow() - start_time).total_seconds()
         logger.info(f"Parse completed in {duration:.2f}s")
@@ -820,27 +876,84 @@ Return ONLY valid JSON in this exact format (no additional text):
         
         return date_str
     
-    # ==================== LLM INTEGRATION ====================
+    # ==================== LLM RESPONSE CACHING ====================
     
-    async def _parse_with_llm(self, cv_text: str) -> Dict[str, Any]:
-        """Use LLM to enhance parsing (optional)"""
-        if not self.llm or not LANGCHAIN_AVAILABLE:
-            return {}
+    def _load_llm_response_from_cache(self, text_hash: str) -> Optional[Dict[str, Any]]:
+        """Load cached LLM JSON response"""
+        cache_path = os.path.join(self.llm_cache_dir, f"{text_hash}.json")
+        
+        if os.path.exists(cache_path):
+            try:
+                with open(cache_path, 'r', encoding='utf-8') as f:
+                    return json.load(f)
+            except Exception as e:
+                logger.warning(f"Failed to load LLM response from cache: {e}")
+        
+        return None
+    
+    def _save_llm_response_to_cache(self, text_hash: str, llm_data: Dict[str, Any], filename: str):
+        """Save LLM JSON response to cache"""
+        cache_path = os.path.join(self.llm_cache_dir, f"{text_hash}.json")
         
         try:
-            chain = LLMChain(llm=self.llm, prompt=self.parse_prompt)
-            result = await chain.arun(cv_text=cv_text[:4000])
-            
-            # Extract JSON from response
-            parsed_data = self._extract_json(result)
-            parsed_data["confidence"] = {
-                "overall": 0.85,
-                "method": "llm"
+            # Add metadata to response
+            cache_data = {
+                "llm_response": llm_data,
+                "metadata": {
+                    "text_hash": text_hash,
+                    "filename": filename,
+                    "cached_at": datetime.utcnow().isoformat(),
+                    "model": self.model_name,
+                    "ollama_url": self.ollama_url
+                }
             }
             
-            return parsed_data
+            with open(cache_path, 'w', encoding='utf-8') as f:
+                json.dump(cache_data, f, indent=2, ensure_ascii=False)
+            
+            logger.info(f"✅ Saved LLM response to cache: {text_hash[:8]}")
         except Exception as e:
-            logger.error(f"LLM parsing error: {e}")
+            logger.warning(f"Failed to save LLM response to cache: {e}")
+    
+    # ==================== LLM INTEGRATION ====================
+    
+    async def _parse_with_llm(self, cv_text: str, file_hash: str = None, filename: str = "unknown") -> Dict[str, Any]:
+        """Use LLM to enhance parsing using direct Ollama API with caching"""
+        if not self.use_llm or not self.llm_extractor:
+            return {}
+        
+        # Generate hash for text content (for LLM cache)
+        text_hash = hashlib.sha256(cv_text.encode()).hexdigest()[:16]
+        
+        # Check LLM response cache first
+        cached_response = self._load_llm_response_from_cache(text_hash)
+        if cached_response:
+            logger.info(f"📦 Loaded LLM response from cache: {text_hash[:8]}")
+            return cached_response.get("llm_response", {})
+        
+        try:
+            logger.info("🤖 Extracting CV data using LLM...")
+            
+            # Use direct Ollama API extractor
+            llm_data = self.llm_extractor.extract_from_text(cv_text[:6000])  # Send up to 6000 chars
+            
+            if llm_data:
+                llm_data["confidence"] = {
+                    "overall": 0.90,
+                    "method": "llm"
+                }
+                logger.info("✅ LLM extraction completed successfully")
+                
+                # Cache the LLM response
+                self._save_llm_response_to_cache(text_hash, llm_data, filename)
+                
+                return llm_data
+            else:
+                logger.warning("⚠️  LLM returned empty data")
+                return {}
+                
+        except Exception as e:
+            logger.error(f"❌ LLM parsing error: {e}")
             return {}
     
     def _extract_json(self, text: str) -> Dict:
